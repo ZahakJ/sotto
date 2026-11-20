@@ -2,6 +2,7 @@ package host
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -15,6 +16,12 @@ type limiter struct {
 	base, max time.Duration
 	now       func() time.Time
 	sleep     func(time.Duration)
+	nextNano  atomic.Int64 // next, readable without waiting for mu
+}
+
+// pending is how long a check started now would wait, as far as is known.
+func (l *limiter) pending() time.Duration {
+	return max(0, time.Unix(0, l.nextNano.Load()).Sub(l.now()))
 }
 
 func newLimiter(base, max time.Duration) *limiter {
@@ -37,5 +44,6 @@ func (l *limiter) attempt(check func() bool) bool {
 		gap = min(l.base<<(l.fails-1), l.max)
 	}
 	l.next = l.now().Add(gap)
+	l.nextNano.Store(l.next.UnixNano())
 	return ok
 }

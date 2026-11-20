@@ -56,6 +56,8 @@ Only the latest release. There are no backports.
   connections, at most one a second; after n wrong guesses in a row the next
   check waits 2^(n-1) seconds, up to five minutes, and a correct one resets
   this. At most four connections may wait to authenticate; more are refused.
-  There is no lockout, and the backoff is lost when the daemon restarts.
+  There is no lockout, and the backoff is lost when the daemon restarts. A
+  client attaching during the backoff is told how long it must wait, and
+  waits.
   Someone who can already run commands as you can also delay your own attach
   by guessing.

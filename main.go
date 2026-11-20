@@ -131,6 +131,9 @@ func run() error {
 		// The host says first whether it holds an identity yet; a new one
 		// gets its passphrase typed twice, as locally.
 		opts.Ask = askPassphrase
+		opts.Wait = func(secs int) {
+			fmt.Fprintf(os.Stderr, "too many attempts, wait %ds …\n", secs)
+		}
 		fmt.Fprintf(os.Stderr, "attaching via %s …\n", opts.Via[0])
 	} else {
 		pass, err := askPassphrase(paths.Fresh(opts.Home))

@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -58,6 +59,10 @@ type Options struct {
 	// whether it holds an identity yet; confirm is true when it does not.
 	// Without Ask, Passphrase is used.
 	Ask func(confirm bool) ([]byte, error)
+
+	// Wait, when attaching, is told how many seconds the host asks the
+	// client to wait before it checks the passphrase.
+	Wait func(secs int)
 }
 
 // Client is a running `concord --bot`.
@@ -71,6 +76,7 @@ type Client struct {
 	nextID atomic.Uint64
 	stderr *tail
 	remote bool // attached to a host daemon rather than a local concord
+	waits  chan int
 
 	writeMu sync.Mutex
 	closed  bool
@@ -176,6 +182,7 @@ func Start(ctx context.Context, o Options) (*Client, error) {
 		events: make(chan proto.Event, 1024),
 		stderr: newTail(20),
 		remote: len(o.Via) > 0,
+		waits:  make(chan int, 16),
 		done:   make(chan struct{}),
 	}
 	c.cmd = exec.Command(bin, args...)
@@ -221,25 +228,34 @@ func Start(ctx context.Context, o Options) (*Client, error) {
 		c.kill()
 		return nil, err
 	}
-	select {
-	case e := <-first:
-		if err := proto.CheckReady(e); err != nil {
-			return fail(err)
-		}
-		c.Ready = e
-		return c, nil
-	case err := <-firstErr:
-		// Usually the child is exiting and its stderr says why; a child that
-		// merely spoke nonsense is still running and gets killed.
+	for {
 		select {
-		case <-c.done:
-		case <-time.After(2 * time.Second):
+		case n := <-c.waits:
+			// The host makes us wait before checking the passphrase;
+			// the ready timeout starts again after that wait.
+			if o.Wait != nil {
+				o.Wait(n)
+			}
+			timer.Reset(timeout + time.Duration(n)*time.Second)
+		case e := <-first:
+			if err := proto.CheckReady(e); err != nil {
+				return fail(err)
+			}
+			c.Ready = e
+			return c, nil
+		case err := <-firstErr:
+			// Usually the child is exiting and its stderr says why; a child that
+			// merely spoke nonsense is still running and gets killed.
+			select {
+			case <-c.done:
+			case <-time.After(2 * time.Second):
+			}
+			return fail(c.exitReason(err))
+		case <-timer.C:
+			return fail(fmt.Errorf("concord did not become ready within %s%s", timeout, c.stderr.hint()))
+		case <-ctx.Done():
+			return fail(ctx.Err())
 		}
-		return fail(c.exitReason(err))
-	case <-timer.C:
-		return fail(fmt.Errorf("concord did not become ready within %s%s", timeout, c.stderr.hint()))
-	case <-ctx.Done():
-		return fail(ctx.Err())
 	}
 }
 
@@ -286,6 +302,16 @@ func (c *Client) read(r io.ReadCloser, br *bufio.Reader, first chan<- proto.Even
 		line, err := readLine(br, maxEventLine)
 		if len(bytes.TrimSpace(line)) > 0 {
 			e, derr := proto.Decode(line)
+			if handshake && c.remote && bytes.HasPrefix(line, []byte("WAIT ")) {
+				// The host is backing off after wrong passphrases.
+				if n, err := strconv.Atoi(string(bytes.TrimSpace(line[5:]))); err == nil && n >= 0 && n <= 3600 {
+					select {
+					case c.waits <- n:
+					default:
+					}
+				}
+				continue
+			}
 			if handshake {
 				handshake = false
 				if derr != nil {

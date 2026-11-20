@@ -102,6 +102,30 @@ func checkClean(t *testing.T) func(error, string) {
 	}
 }
 
+// A host backing off after wrong guesses says how long to wait; the client
+// reports it and waits past its ready timeout instead of failing.
+func TestHostWaitIsReportedAndWaitedFor(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var waits []int
+	c, err := Start(context.Background(), Options{
+		Via:          []string{exe, "host-wait"},
+		Env:          []string{fakebot.Env + "=1", "PATH=" + os.Getenv("PATH")},
+		Passphrase:   []byte("pw"),
+		ReadyTimeout: time.Second,
+		Wait:         func(secs int) { waits = append(waits, secs) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if !slices.Equal(waits, []int{2, 1}) {
+		t.Fatalf("waits reported: %v", waits)
+	}
+}
+
 // A relative $PATH entry would run whatever "concord" sits in the current
 // directory, which may be a checkout or a download.
 func TestLocateIgnoresRelativePathEntries(t *testing.T) {

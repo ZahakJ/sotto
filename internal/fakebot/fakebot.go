@@ -19,12 +19,15 @@ package fakebot
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ZahakJ/sotto/internal/proto"
 )
 
 // Env is the variable that turns a test binary into the fake.
@@ -61,6 +64,27 @@ func Main(args []string) int {
 		}
 		return 0
 	case "--bot":
+	case "host-wait":
+		// Plays an attach host whose daemon is backing off: greeting,
+		// handshake, two WAIT lines over 1.5s, then the bot protocol.
+		fmt.Println("HOST " + proto.HelloVersion + " existing")
+		var line []byte
+		for b := make([]byte, 1); len(line) < 4096; {
+			if n, _ := os.Stdin.Read(b); n == 0 {
+				break
+			}
+			if line = append(line, b[0]); b[0] == '\n' {
+				break
+			}
+		}
+		if _, err := proto.ReadHello(bufio.NewReader(bytes.NewReader(line))); err != nil {
+			fmt.Fprintln(os.Stderr, "fake host:", err)
+			return 1
+		}
+		fmt.Println("WAIT 2")
+		time.Sleep(750 * time.Millisecond)
+		fmt.Println("WAIT 1")
+		time.Sleep(750 * time.Millisecond)
 	default:
 		fmt.Fprintln(os.Stderr, "fake: unexpected arguments", args)
 		return 2

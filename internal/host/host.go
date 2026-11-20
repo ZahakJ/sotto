@@ -34,6 +34,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -56,6 +57,9 @@ type Config struct {
 
 // missedCap bounds the events kept for a client that is not attached.
 const missedCap = 500
+
+// statusTimeout bounds the wait for the daemon's answer to a handshake.
+var statusTimeout = 30 * time.Second
 
 // maxCommand bounds one line from the attached client, as concord does.
 const maxCommand = 1 << 20
@@ -151,15 +155,31 @@ func Attach(cfg Config, stdin io.Reader, stdout io.Writer) error {
 	}
 	clear(pass)
 	br := bufio.NewReader(conn)
-	_ = conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-	status, err := br.ReadString('\n')
-	if err != nil {
-		return errors.New("the host daemon closed the connection")
+	// The daemon may first say how long it is backing off ("WAIT n");
+	// pass that on and wait that much longer.
+	deadline := time.Now().Add(statusTimeout)
+	for {
+		_ = conn.SetReadDeadline(deadline)
+		status, err := br.ReadString('\n')
+		if err != nil {
+			return errors.New("no answer from the host daemon")
+		}
+		status = strings.TrimSpace(status)
+		if n, ok := strings.CutPrefix(status, "WAIT "); ok {
+			secs, err := strconv.Atoi(n)
+			if err != nil || secs < 0 || secs > 3600 {
+				return fmt.Errorf("unexpected answer from the host daemon: %q", status)
+			}
+			fmt.Fprintf(stdout, "WAIT %d\n", secs)
+			deadline = time.Now().Add(time.Duration(secs)*time.Second + statusTimeout)
+			continue
+		}
+		if status != "OK" {
+			return errors.New(strings.TrimPrefix(status, "ERR "))
+		}
+		break
 	}
 	_ = conn.SetReadDeadline(time.Time{})
-	if status = strings.TrimSpace(status); status != "OK" {
-		return errors.New(strings.TrimPrefix(status, "ERR "))
-	}
 
 	done := make(chan struct{}, 2)
 	go func() {
@@ -402,6 +422,32 @@ func (d *daemon) accept() {
 	}
 }
 
+// announce tells a connection waiting for its passphrase check how long
+// the backoff has left ("WAIT <seconds>"), now and every few seconds, until
+// the returned stop is called.
+func (d *daemon) announce(conn net.Conn) (stop func()) {
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		tick := time.NewTicker(5 * time.Second)
+		defer tick.Stop()
+		for {
+			if w := d.limit.pending(); w > time.Second {
+				_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+				fmt.Fprintf(conn, "WAIT %d\n", int((w+time.Second-1)/time.Second))
+			}
+			select {
+			case <-done:
+				return
+			case <-tick.C:
+			}
+		}
+	}()
+	return func() { close(done); wg.Wait() }
+}
+
 func (d *daemon) serve(conn net.Conn) {
 	if err := checkPeer(conn, os.Getuid()); err != nil {
 		conn.Close()
@@ -423,7 +469,9 @@ func (d *daemon) serve(conn net.Conn) {
 		conn.Close()
 		return
 	}
+	stop := d.announce(conn)
 	ok := d.limit.attempt(func() bool { return hmac.Equal(d.sum(pass), d.mac) })
+	stop()
 	clear(pass)
 	<-d.unauth
 	if !ok {
