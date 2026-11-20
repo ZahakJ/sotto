@@ -2,7 +2,9 @@ package host
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -91,5 +93,45 @@ func TestMissedOverflowIsCounted(t *testing.T) {
 	}
 	if string(d.missed[0]) != "7\n" {
 		t.Fatalf("oldest kept %q", d.missed[0])
+	}
+}
+
+// A host with no identity is announced as new before the passphrase is
+// asked for, so the client can ask twice; a running host or an existing
+// identity is not.
+func TestFirstRemoteAttachAsksTwice(t *testing.T) {
+	base := t.TempDir()
+	t.Cleanup(func() { _ = exec.Command("pkill", "-f", "--", "--home "+base).Run() })
+	var asked []bool
+	ask := func(confirm bool) ([]byte, error) {
+		asked = append(asked, confirm)
+		return []byte("pw"), nil
+	}
+	start := func() *bot.Client {
+		t.Helper()
+		o := attach(t, base, "")
+		o.Passphrase, o.Ask = nil, ask
+		c, err := bot.Start(context.Background(), o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	c := start() // nothing there yet
+	c.Close()
+	time.Sleep(1100 * time.Millisecond)
+	c = start() // daemon running
+	_, _ = c.Send(proto.Command{Cmd: "host-stop"})
+	c.Close()
+	time.Sleep(time.Second)
+	_ = os.MkdirAll(filepath.Join(base, "identity"), 0o700)
+	if err := os.WriteFile(filepath.Join(base, "identity", "key"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c = start() // daemon stopped, identity on disk
+	_, _ = c.Send(proto.Command{Cmd: "host-stop"})
+	c.Close()
+	if fmt.Sprint(asked) != "[true false false]" {
+		t.Fatalf("confirm asked as %v, want [true false false]", asked)
 	}
 }

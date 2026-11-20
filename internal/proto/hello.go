@@ -8,15 +8,44 @@ import (
 	"io"
 )
 
-// HelloVersion names the attach handshake. An attaching client sends one
-// line, "HELLO concord-cli-host/1 <base64 passphrase>", before the bot
-// protocol starts. The passphrase travels inside the transport (the mesh's
+// HelloVersion names the attach handshake. The host first says whether it
+// holds an identity yet, "HOST concord-cli-host/2 new" or "... existing", so
+// that the client knows to ask for a new passphrase twice. The client then
+// sends one line, "HELLO concord-cli-host/2 <base64 passphrase>", before the
+// bot protocol starts. The passphrase travels inside the transport (the mesh's
 // encrypted session), never in an environment variable or argument of the
 // remote process, so nothing on the remote side can read it from ps or
 // /proc/*/cmdline.
-const HelloVersion = "concord-cli-host/1"
+const HelloVersion = "concord-cli-host/2"
 
 const helloPrefix = "HELLO " + HelloVersion + " "
+
+const greetPrefix = "HOST " + HelloVersion + " "
+
+// WriteGreeting announces the host; fresh means it has no identity yet.
+func WriteGreeting(w io.Writer, fresh bool) error {
+	state := "existing"
+	if fresh {
+		state = "new"
+	}
+	_, err := io.WriteString(w, greetPrefix+state+"\n")
+	return err
+}
+
+// ReadGreeting reads the host's announcement and reports whether it is new.
+func ReadGreeting(r *bufio.Reader) (fresh bool, err error) {
+	line, err := r.ReadSlice('\n')
+	if err != nil {
+		return false, errors.New("no greeting from the host (is concord-cli installed there, and the same version?)")
+	}
+	switch string(bytes.TrimRight(line, "\r\n")) {
+	case greetPrefix + "new":
+		return true, nil
+	case greetPrefix + "existing":
+		return false, nil
+	}
+	return false, errors.New("the host does not speak " + HelloVersion + " (is it the same version?)")
+}
 
 // WriteHello writes the handshake and zeroes its own buffers. The caller
 // still owns, and should zero, pass.

@@ -127,18 +127,20 @@ func run() error {
 		return err
 	}
 
-	pass, err := askPassphrase(!remoteMode && paths.Fresh(opts.Home))
-	if err != nil {
-		return err
-	}
-	opts.Passphrase = pass // Start zeroes it
 	if remoteMode {
+		// The host says first whether it holds an identity yet; a new one
+		// gets its passphrase typed twice, as locally.
+		opts.Ask = askPassphrase
 		fmt.Fprintf(os.Stderr, "attaching via %s …\n", opts.Via[0])
 	} else {
+		pass, err := askPassphrase(paths.Fresh(opts.Home))
+		if err != nil {
+			return err
+		}
+		opts.Passphrase = pass // Start zeroes it
 		fmt.Fprintln(os.Stderr, "unlocking and joining the network …")
 	}
 	client, err := bot.Start(context.Background(), opts)
-	clear(pass)
 	if err != nil {
 		return err
 	}
@@ -180,7 +182,7 @@ func askPassphrase(confirm bool) ([]byte, error) {
 		return b, err
 	}
 	if confirm {
-		fmt.Fprintln(os.Stderr, "No identity here yet; one will be created. Choose a passphrase.")
+		fmt.Fprintln(os.Stderr, "No identity on that machine yet; one will be created. Choose a passphrase.")
 	}
 	pass, err := read("Passphrase: ")
 	if err != nil {

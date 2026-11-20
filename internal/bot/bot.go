@@ -52,6 +52,11 @@ type Options struct {
 	// transport's stdin as the first line, not into any environment.
 	Via    []string
 	Remote []string
+
+	// Ask, when attaching, supplies the passphrase once the host has said
+	// whether it holds an identity yet; confirm is true when it does not.
+	// Without Ask, Passphrase is used.
+	Ask func(confirm bool) ([]byte, error)
 }
 
 // Client is a running `concord --bot`.
@@ -192,10 +197,13 @@ func Start(ctx context.Context, o Options) (*Client, error) {
 		c.exitErr = c.cmd.Wait()
 		close(c.done)
 	}()
+	timeout := o.ReadyTimeout
+	if timeout <= 0 {
+		timeout = 2 * time.Minute
+	}
+	br := bufio.NewReaderSize(outR, 64*1024)
 	if len(o.Via) > 0 {
-		err := proto.WriteHello(inW, o.Passphrase)
-		clear(o.Passphrase)
-		if err != nil {
+		if err := c.hello(br, o, timeout); err != nil {
 			c.kill()
 			outR.Close()
 			return nil, fmt.Errorf("attaching via %s: %v%s", bin, err, c.stderr.hint())
@@ -204,12 +212,8 @@ func Start(ctx context.Context, o Options) (*Client, error) {
 
 	first := make(chan proto.Event, 1)
 	firstErr := make(chan error, 1)
-	go c.read(outR, first, firstErr)
+	go c.read(outR, br, first, firstErr)
 
-	timeout := o.ReadyTimeout
-	if timeout <= 0 {
-		timeout = 2 * time.Minute
-	}
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	fail := func(err error) (*Client, error) {
@@ -240,10 +244,42 @@ func Start(ctx context.Context, o Options) (*Client, error) {
 
 // read decodes stdout. The first event goes to first (or an error to
 // firstErr); the rest to c.events, which closes when stdout does.
-func (c *Client) read(r io.ReadCloser, first chan<- proto.Event, firstErr chan<- error) {
+// hello reads the host's greeting, gets the passphrase (asking twice when
+// the host is new), and sends the handshake.
+func (c *Client) hello(br *bufio.Reader, o Options, timeout time.Duration) error {
+	type greeting struct {
+		fresh bool
+		err   error
+	}
+	got := make(chan greeting, 1)
+	go func() {
+		fresh, err := proto.ReadGreeting(br)
+		got <- greeting{fresh, err}
+	}()
+	var g greeting
+	select {
+	case g = <-got:
+	case <-time.After(timeout):
+		c.kill() // unblocks the reader
+		return fmt.Errorf("no greeting from the host within %s", timeout)
+	}
+	if g.err != nil {
+		return g.err
+	}
+	pass := o.Passphrase
+	if o.Ask != nil {
+		var err error
+		if pass, err = o.Ask(g.fresh); err != nil {
+			return err
+		}
+		defer clear(pass)
+	}
+	return proto.WriteHello(c.stdin, pass)
+}
+
+func (c *Client) read(r io.ReadCloser, br *bufio.Reader, first chan<- proto.Event, firstErr chan<- error) {
 	defer r.Close()
 	defer close(c.events)
-	br := bufio.NewReaderSize(r, 64*1024)
 	handshake := true
 	for {
 		line, err := readLine(br, maxEventLine)

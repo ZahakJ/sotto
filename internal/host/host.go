@@ -105,6 +105,14 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 // Attach serves one client on stdin/stdout: it reads the handshake, makes
 // sure the daemon runs (starting it with this passphrase if not), and relays.
 func Attach(cfg Config, stdin io.Reader, stdout io.Writer) error {
+	fresh := paths.Fresh(cfg.Home)
+	if c, err := net.Dial("unix", cfg.Sock); err == nil {
+		c.Close()
+		fresh = false // a daemon runs, whatever is on disk
+	}
+	if err := proto.WriteGreeting(stdout, fresh); err != nil {
+		return err
+	}
 	in := bufio.NewReader(stdin)
 	pass, err := proto.ReadHello(in)
 	if err != nil {
