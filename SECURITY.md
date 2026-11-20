@@ -1,0 +1,40 @@
+# Security policy
+
+concord-cli is a front end for `concord --bot`. Concord's own cryptography,
+networking and threat model are Concord's; report problems there to that
+project, through its
+[security policy](https://github.com/ZahakJ/concord/blob/main/SECURITY.md).
+
+Report here what this client adds:
+
+- remote text reaching the terminal as a control sequence (any escape, C1
+  control, or bidi override in a name, message, guild, channel or error);
+- the passphrase leaving the process other than to concord's environment or,
+  when attaching, down the transport's stdin, or being written anywhere;
+- the host daemon accepting an attach without the right passphrase, or being
+  reachable by another user;
+- the client opening or writing the Concord app's profile.
+
+## How to report
+
+Use GitHub's private vulnerability reporting: the *Security* tab, then
+*Report a vulnerability*. Please do not open a public issue until a fix has
+shipped. Say which version you tested (`concord-cli --version`) and how to
+reproduce it. A failing test in the style of
+`TestEscapeInjectionThroughEveryRemoteField` is ideal.
+
+## Supported versions
+
+Only the latest release. There are no backports.
+
+## Known limits
+
+- Go strings cannot be wiped. The passphrase is read into a byte slice and
+  zeroed after use, but the copy placed in concord's environment is a string
+  and lives until garbage collection. concord itself holds it for as long as
+  it runs, and the same user can read it from `/proc/<pid>/environ`.
+- Verification marks are kept per device in `verified.json`. They are not
+  shared with Concord or with your other devices.
+- A host's daemon serves whoever can run commands as you on that machine and
+  knows the passphrase. Wrong guesses are slowed to one a second, not locked
+  out.
