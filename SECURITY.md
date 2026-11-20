@@ -11,8 +11,11 @@ Report here what this client adds:
   control, or bidi override in a name, message, guild, channel or error);
 - the passphrase leaving the process other than to concord's environment or,
   when attaching, down the transport's stdin, or being written anywhere;
-- a peer's chosen name passing for another member's or carrying the
-  verified mark;
+- the verified mark appearing beside anyone whose fingerprint you have not
+  verified;
+- a name shown without a fingerprint tag when it matches yours or another
+  member's after invisible characters are removed, or under the Unicode
+  17.0 confusables data;
 - the host daemon accepting an attach without the right passphrase, or being
   reachable by another user;
 - the client opening or writing the Concord app's profile.
@@ -41,6 +44,11 @@ Only the latest release. There are no backports.
   connections from any other uid; elsewhere it relies on the socket's
   directory being private (0700). The concord it runs is dumpable again
   after exec and holds the passphrase, as above.
+- Look-alike detection is only as good as Unicode's confusables and
+  identifier data (17.0.0, generated into `internal/safe/tables.go`). Two
+  names can look identical in some font and still differ under those rules;
+  such names are not tagged. Only the ✓ and the fingerprint identify a
+  member.
 - Verification marks are kept per device in `verified.json`. They are not
   shared with Concord or with your other devices.
 - A host's daemon serves whoever can run commands as you on that machine and

@@ -3,6 +3,7 @@ package safe
 import (
 	"strings"
 	"testing"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -149,4 +150,88 @@ func FuzzLine(f *testing.F) {
 		controlFree(t, Line(s), false)
 		controlFree(t, Text(s), true)
 	})
+}
+
+func r(cp ...rune) string { return string(cp) }
+
+// Every Default_Ignorable_Code_Point, assigned or not, is removed from
+// names. Checked against Go's own Unicode tables, independently of the
+// generated one: Other_Default_Ignorable_Code_Point and the variation
+// selectors (with Cf, which TestNameStripsInvisiblesAndChecks covers).
+func TestNameStripsEveryDefaultIgnorable(t *testing.T) {
+	for _, tab := range []*unicode.RangeTable{unicode.Other_Default_Ignorable_Code_Point, unicode.Variation_Selector} {
+		for _, rg := range tab.R16 {
+			for c := rune(rg.Lo); c <= rune(rg.Hi); c += rune(rg.Stride) {
+				if got := Name("a" + r(c) + "b"); got != "ab" {
+					t.Errorf("U+%04X kept: %q", c, got)
+				}
+			}
+		}
+		for _, rg := range tab.R32 {
+			for c := rune(rg.Lo); c <= rune(rg.Hi); c += rune(rg.Stride) {
+				if got := Name("a" + r(c) + "b"); got != "ab" {
+					t.Errorf("U+%04X kept: %q", c, got)
+				}
+			}
+		}
+	}
+	// The review's examples.
+	for _, c := range []rune{0x180b, 0x17b5, 0x17b4, 0x2065, 0xe0000, 0xe0fff, 0x1bca0, 0xfff0, 0xffa0, 0x115f, 0x1160, 0x3164, 0xfeff, 0x2064, 0x061c, 0x034f, 0xe0100} {
+		if got := Name("alice" + r(c)); got != "alice" {
+			t.Errorf("U+%04X kept: %q", c, got)
+		}
+	}
+}
+
+// Skeleton follows UTS #39: names that can look alike share one, including
+// across scripts and with marks, blanks and symbols around the letters.
+func TestSkeletonCatchesConfusables(t *testing.T) {
+	alice := Skeleton("alice")
+	for _, s := range []string{
+		r(0x430) + "lice",      // Cyrillic a
+		"al" + r(0x131) + "ce", // dotless i
+		r(0x1d41a) + "lice",    // mathematical bold a
+		"alice" + r(0x301),     // combining acute
+		"alice" + r(0x1d159),   // musical null notehead
+		"alice" + r(0x2e3a),    // two-em dash
+		"alice" + r(0x16ed),    // runic cross punctuation
+		r(0x221a) + "alice",    // square root
+		"alice" + r(0xfffc),    // object replacement
+		"alice" + r(0xa0),      // no-break space
+		"ALICE",
+		"a" + r(0x217c) + "ice", // small roman numeral fifty
+		"a1ice",
+	} {
+		if Skeleton(s) != alice {
+			t.Errorf("%+q: skeleton %+q, want %+q", s, Skeleton(s), alice)
+		}
+	}
+	for _, s := range []string{"alicia", "bob", "malice", "ali"} {
+		if Skeleton(s) == alice {
+			t.Errorf("%q shares alice's skeleton", s)
+		}
+	}
+}
+
+func TestConfusableCatchesCapitalI(t *testing.T) {
+	if !Confusable("aIice", "alice") || !Confusable("alice", "ALICE") || Confusable("alice", "bob") {
+		t.Fatal("Confusable")
+	}
+}
+
+// Letters outside UTS #39's Allowed identifier set (small capitals,
+// mathematical letters, obsolete scripts) mark a name as restricted; the
+// client then always shows its fingerprint tag. Names in living scripts
+// are not restricted.
+func TestRestricted(t *testing.T) {
+	for _, s := range []string{r(0x1d00) + "lice", r(0x1d41a) + "lice", "al" + r(0x16a0) + "ce", r(0xa61c)} {
+		if !Restricted(s) {
+			t.Errorf("%+q not restricted", s)
+		}
+	}
+	for _, s := range []string{"alice", "Zo" + r(0xeb), "bob smith", "x_1-2.3", r(0x410, 0x43b, 0x438, 0x441, 0x430), r(0x645, 0x62d, 0x645, 0x62f), r(0x674e), "alice " + r(0x2713)} {
+		if Restricted(s) {
+			t.Errorf("%+q restricted", s)
+		}
+	}
 }

@@ -63,11 +63,15 @@ someone in it: `/join <code>`.
 | `/whoami` | your own fingerprint |
 | `/help` | the rest |
 
-Names are self-chosen, so two members whose names look alike are shown
-with a fingerprint tag (`alice·MALL`). Verifying means typing the whole
-fingerprint the other person reads out to you; a name alone verifies
-nothing. The ✓ sits in a column of its own before the name, and no name can
-contain one.
+Names are self-chosen and prove nothing; fingerprints do. sotto removes
+invisible characters and check marks from names. It adds the sender's
+fingerprint (`alice·MALL`) to a name that matches yours or another member's
+under Unicode's look-alike rules (the UTS #39 confusables, Unicode 17.0), or
+that uses letters outside Unicode's identifier set. That data is not
+complete and fonts differ, so the tag is a warning, and its absence proves
+nothing. The ✓ is what identifies someone. It appears only for a fingerprint
+you have verified by typing it in full, in a column of its own before the
+name, and no name can produce it.
 
 ## Attach from another machine
 
@@ -93,8 +97,9 @@ the following.
 
 - **Remote text is inert.** Names, messages, guild and channel names, and
   error text are cleaned once, where the protocol is decoded, so no peer can
-  send the terminal a control sequence. Names also lose invisible and
-  look-alike characters, so that one cannot pass for another.
+  send the terminal a control sequence. Names also lose invisible
+  characters and check marks. Names that look alike under Unicode's rules
+  are tagged with a fingerprint, as described under *Use*.
 - **The passphrase is typed, never stored.** It is read from a hidden
   prompt, zeroed after use where Go allows, and given to `concord` only in
   its environment, which is the only way concord accepts one. sotto never
@@ -177,3 +182,6 @@ maintainer's direction.
 
 GNU Affero General Public License, version 3 or later, as Concord. See
 [LICENSE](LICENSE).
+
+`internal/safe/tables.go` is generated from Unicode data, which is under the
+Unicode License v3 ([LICENSE-UNICODE](LICENSE-UNICODE)).

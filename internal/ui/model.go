@@ -95,6 +95,7 @@ type Model struct {
 	swSel       int
 	scroll      int
 	notice      string
+	keys        map[string]safe.Key // name comparison keys, cached
 	noticeBad   bool
 
 	// Err is why the connection ended, if it did.
@@ -106,7 +107,7 @@ func New(b Sender, t *trust.Store, ready proto.Event, o Options) *Model {
 	m := &Model{
 		bot: b, trust: t, opts: o, th: newTheme(true, o.Plain),
 		selfFP: ready.Fingerprint, selfName: ready.Name,
-		msgs: map[string][]*message{}, unread: map[string]int{},
+		msgs: map[string][]*message{}, unread: map[string]int{}, keys: map[string]safe.Key{},
 		members: map[string][]proto.Member{}, pending: map[uint64]pendingCmd{},
 	}
 	m.setGuilds(ready.Guilds)
@@ -378,14 +379,30 @@ func (m *Model) unverify(arg string) {
 // displayName adds a fingerprint tag when the name is not unique in the
 // guild, or when someone else uses the user's own name: names are
 // self-chosen and only fingerprints identify.
+// nameKey returns a name's comparison key, cached: names repeat on every frame.
+func (m *Model) nameKey(name string) safe.Key {
+	if k, ok := m.keys[name]; ok {
+		return k
+	}
+	if len(m.keys) > 4096 {
+		clear(m.keys)
+	}
+	k := safe.KeyOf(name)
+	m.keys[name] = k
+	return k
+}
+
 func (m *Model) displayName(guildID string, msg *message) string {
 	if msg.own {
 		return m.selfName
 	}
-	sk := safe.Skeleton(msg.name)
-	clash := sk == safe.Skeleton(m.selfName)
+	// Tag the name with the sender's fingerprint when it may pass for the
+	// user's own or another member's (safe.Key), or uses letters outside
+	// the Unicode identifier set, which look-alike data does not cover.
+	k := m.nameKey(msg.name)
+	clash := k.Like(m.nameKey(m.selfName)) || safe.Restricted(msg.name)
 	for _, x := range m.members[guildID] {
-		if safe.Skeleton(x.Name) == sk && trust.Norm(x.Fingerprint) != trust.Norm(msg.sender) {
+		if !clash && trust.Norm(x.Fingerprint) != trust.Norm(msg.sender) && k.Like(m.nameKey(x.Name)) {
 			clash = true
 		}
 	}

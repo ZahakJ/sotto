@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -399,5 +400,48 @@ func TestQuit(t *testing.T) {
 	}
 	if _, ok := cmd().(tea.QuitMsg); !ok {
 		t.Fatal("ctrl-c returned something other than quit")
+	}
+}
+
+// Ported from the re-review's TestPoCSpoof2: every name that can pass for
+// verified alice gets the fingerprint tag.
+func TestLookalikeNamesAreTagged(t *testing.T) {
+	r := func(cp ...rune) string { return string(cp) }
+	cands := map[string]string{
+		"zwsp": "alice" + r(0x200b), "check": "alice " + r(0x2713), "mongolFVS": "alice" + r(0x180b),
+		"khmer17b5": "alice" + r(0x17b5), "khmer17b4": "al" + r(0x17b4) + "ice", "objrepl": "alice" + r(0xfffc),
+		"nullnote": "alice" + r(0x1d159), "unassignedDI": "alice" + r(0x2065), "tagUnassigned": "alice" + r(0xe0000),
+		"E0FFF": "alice" + r(0xe0fff), "cgj": "alice" + r(0x34f), "cyrillic": r(0x430) + "lice",
+		"fullwidth": r(0xff41) + "lice", "combining": "alice" + r(0x301), "nbsp": "alice" + r(0xa0),
+		"heavycheck": r(0x2714, 0xfe0f) + " alice", "ballot": r(0x1f5f8) + " alice", "smallcaps": r(0x1d00) + "lice",
+		"mathbold": r(0x1d41a) + "lice", "dotless": "al" + r(0x131) + "ce", "FFF0": "alice" + r(0xfff0),
+		"hangulHF": "alice" + r(0xffa0), "1BCA0": "alice" + r(0x1bca0), "ALM": "alice" + r(0x61c),
+		"U+2064": "alice" + r(0x2064), "U+3164": "alice" + r(0x3164), "VS17": "alice" + r(0xe0100),
+		"U+1160": "alice" + r(0x1160), "BOM": r(0xfeff) + "alice", "sqrt": r(0x221a) + "alice",
+		"runic": "alice" + r(0x16ed), "twoem": "alice" + r(0x2e3a),
+	}
+	m, _ := newModel(t, 120, 60, true)
+	m.update(EventMsg{members(fakebot.SelfFP, "me", fakebot.AliceFP, "alice", fakebot.MalloryFP, "x")})
+	if err := m.trust.Mark(fakebot.AliceFP, "alice"); err != nil {
+		t.Fatal(err)
+	}
+	i := 0
+	for k, v := range cands {
+		i++
+		e, err := proto.Decode([]byte(`{"type":"message","guildId":"g-den","channelId":"c-gen","messageId":"` + strconv.Itoa(i) +
+			`","sender":"` + fakebot.MalloryFP + `","senderName":` + js(v) + `,"content":"T-` + k + `-","sent":"2026-11-19T10:04:00Z"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.update(EventMsg{e})
+		var l string
+		for _, x := range strings.Split(m.screen(), "\n") {
+			if strings.Contains(x, "T-"+k+"-") {
+				l = x
+			}
+		}
+		if !strings.Contains(l, "·MALL") || strings.Contains(l, "✓") {
+			t.Errorf("%s (%+q): %q", k, e.SenderName, strings.TrimSpace(l))
+		}
 	}
 }

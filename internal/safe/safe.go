@@ -9,6 +9,8 @@
 // an 8-bit control as U+FFFD. A reader sees that something odd was sent.
 package safe
 
+//go:generate go run gen_tables.go
+
 import (
 	"strings"
 	"unicode"
@@ -64,22 +66,75 @@ func Name(s string) string {
 	return b.String()
 }
 
-// Skeleton is what two names are compared by: Name, then NFKC and case
-// folding, so that "alice", "ALICE" and a fullwidth "ａlice" collide.
+// Skeleton is what two names are compared by, after UTS #39: Name, then
+// NFKC and case folding, then each character replaced by its confusables
+// prototype (Cyrillic "а" becomes "a", "1" becomes "l"), and finally only
+// letters and digits kept, so that marks, blanks, symbols and punctuation
+// around a name do not make it different. Two names with one skeleton may
+// look alike; two with different skeletons are not guaranteed not to.
 func Skeleton(s string) string {
-	return Name(cases.Fold().String(norm.NFKC.String(Name(s))))
+	return letters(proto(fold(proto(norm.NFD.String(fold(Name(s)))))))
 }
 
-func invisible(r rune) bool {
-	switch {
-	case unicode.Is(unicode.Cf, r): // ZWSP, ZWJ, WJ, soft hyphen, bidi marks, tags
-		return true
-	case r >= 0xfe00 && r <= 0xfe0f, r >= 0xe0100 && r <= 0xe01ef: // variation selectors
-		return true
-	case r == 0x034f, r == 0x115f, r == 0x1160, r == 0x3164, r == 0xffa0, r == 0x2800:
-		return true // grapheme joiner, Hangul fillers, braille blank
+// Key holds the two skeletons a name is compared by.
+type Key [2]string
+
+// KeyOf computes a name's Key: Skeleton, and a variant that maps
+// prototypes before folding, so that "aIice" (capital I) matches "alice".
+func KeyOf(s string) Key {
+	strict := letters(proto(fold(proto(norm.NFD.String(norm.NFKC.String(Name(s)))))))
+	return Key{Skeleton(s), strict}
+}
+
+// Like reports whether names with keys k and o may pass for each other.
+func (k Key) Like(o Key) bool { return k[0] == o[0] || k[1] == o[1] }
+
+// Confusable reports whether a and b may pass for each other.
+func Confusable(a, b string) bool { return KeyOf(a).Like(KeyOf(b)) }
+
+// Restricted reports whether a name uses a letter or digit outside the
+// UTS #39 Allowed identifier set: small capitals, mathematical alphabets,
+// historic scripts and the like, which confusables data does not fully
+// cover. Spaces, punctuation and symbols do not count.
+func Restricted(s string) bool {
+	for _, r := range norm.NFC.String(Name(s)) {
+		if (unicode.IsLetter(r) || unicode.IsDigit(r)) && !unicode.Is(allowed, r) {
+			return true
+		}
 	}
 	return false
+}
+
+func fold(s string) string { return norm.NFD.String(cases.Fold().String(norm.NFKC.String(s))) }
+
+// proto replaces each character by its confusables prototype.
+func proto(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if p, ok := confusables[r]; ok {
+			b.WriteString(p)
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return norm.NFD.String(b.String())
+}
+
+func letters(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// invisible reports characters that render as nothing: every
+// Default_Ignorable_Code_Point (tables.go, generated from Unicode data,
+// unassigned ones included), every format character, and the braille blank.
+func invisible(r rune) bool {
+	return unicode.Is(defaultIgnorable, r) || unicode.Is(unicode.Cf, r) || r == 0x2800
 }
 
 func checkLike(r rune) bool {

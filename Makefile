@@ -9,7 +9,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 CONCORD_SRC ?= ../concord
 CONCORD_BIN ?=
 
-.PHONY: build test vet fmt fuzz vuln e2e clean help
+.PHONY: build test vet fmt fuzz vuln e2e tables clean help
 
 build: ## build bin/sotto
 	go build -trimpath -ldflags '$(LDFLAGS)' -o $(OUT)/sotto .
@@ -37,6 +37,9 @@ e2e: build ## two real peers on this machine (needs CONCORD_SRC or CONCORD_BIN)
 	fi; \
 	CONCORD_BIN="$$bin" SOTTO_BIN="$(abspath $(OUT))/sotto" \
 		go test -tags e2e -count=1 -v -timeout 10m ./e2e
+
+tables: ## regenerate internal/safe/tables.go from the pinned Unicode data
+	go generate ./internal/safe
 
 clean:
 	rm -rf $(OUT)
