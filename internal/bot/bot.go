@@ -296,7 +296,7 @@ func (c *Client) read(r io.ReadCloser, br *bufio.Reader, first chan<- proto.Even
 				continue
 			}
 			if derr != nil {
-				e = proto.Event{Type: "client-error", Error: derr.Error()}
+				e = decodeError(derr)
 			}
 			c.events <- e
 			if e.Type == "replayed" && c.remote {
@@ -321,6 +321,11 @@ func (c *Client) read(r io.ReadCloser, br *bufio.Reader, first chan<- proto.Even
 }
 
 var errLong = errors.New("line too long")
+
+// decodeError reports a line that would not decode.
+func decodeError(err error) proto.Event {
+	return proto.Event{Type: "client-error", Error: safe.Line(err.Error())}
+}
 
 func readLine(r *bufio.Reader, max int) ([]byte, error) {
 	var buf []byte

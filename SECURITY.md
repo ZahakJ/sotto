@@ -11,6 +11,8 @@ Report here what this client adds:
   control, or bidi override in a name, message, guild, channel or error);
 - the passphrase leaving the process other than to concord's environment or,
   when attaching, down the transport's stdin, or being written anywhere;
+- a peer's chosen name passing for another member's or carrying the
+  verified mark;
 - the host daemon accepting an attach without the right passphrase, or being
   reachable by another user;
 - the client opening or writing the Concord app's profile.
@@ -33,6 +35,12 @@ Only the latest release. There are no backports.
   zeroed after use, but the copy placed in concord's environment is a string
   and lives until garbage collection. concord itself holds it for as long as
   it runs, and the same user can read it from `/proc/<pid>/environ`.
+- The host daemon turns off core dumps and, on Linux, marks itself
+  non-dumpable, so the same user cannot read its memory or environment
+  through `/proc` or ptrace. On Linux and macOS it also refuses socket
+  connections from any other uid; elsewhere it relies on the socket's
+  directory being private (0700). The concord it runs is dumpable again
+  after exec and holds the passphrase, as above.
 - Verification marks are kept per device in `verified.json`. They are not
   shared with Concord or with your other devices.
 - A host's daemon serves whoever can run commands as you on that machine and

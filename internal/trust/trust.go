@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -31,18 +32,26 @@ type Store struct {
 
 // Load reads the store at path; a missing file is an empty store.
 func Load(path string) (*Store, error) {
-	s := &Store{path: path, m: map[string]Entry{}}
+	m, err := read(path)
+	if err != nil {
+		return nil, err
+	}
+	return &Store{path: path, m: m}, nil
+}
+
+func read(path string) (map[string]Entry, error) {
+	m := map[string]Entry{}
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return s, nil
+		return m, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(b, &s.m); err != nil {
+	if err := json.Unmarshal(b, &m); err != nil {
 		return nil, fmt.Errorf("%s is unreadable (%v); move it aside to start over", path, err)
 	}
-	return s, nil
+	return m, nil
 }
 
 // Norm reduces a fingerprint to its 32 base32 characters, upper case.
@@ -73,29 +82,49 @@ func (s *Store) Verified(fp string) bool {
 
 // Mark records fp as verified and saves.
 func (s *Store) Mark(fp, name string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.m[Norm(fp)] = Entry{Name: name, At: time.Now().UTC().Truncate(time.Second)}
-	return s.save()
+	e := Entry{Name: name, At: time.Now().UTC().Truncate(time.Second)}
+	return s.change(func(m map[string]Entry) { m[Norm(fp)] = e })
 }
 
 // Unmark forgets fp and saves.
 func (s *Store) Unmark(fp string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.m, Norm(fp))
-	return s.save()
+	return s.change(func(m map[string]Entry) { delete(m, Norm(fp)) })
 }
 
-func (s *Store) save() error {
+// change applies fn to the file's current contents under an exclusive lock,
+// so that another client sharing the file loses none of its changes.
+func (s *Store) change(fn func(map[string]Entry)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return err
 	}
-	b, err := json.MarshalIndent(s.m, "", "  ")
+	lock, err := os.OpenFile(s.path+".lock", os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(s.path), ".verified-*")
+	defer lock.Close() // closing releases the lock
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		return err
+	}
+	m, err := read(s.path)
+	if err != nil {
+		return err
+	}
+	fn(m)
+	if err := save(s.path, m); err != nil {
+		return err
+	}
+	s.m = m
+	return nil
+}
+
+func save(path string, m map[string]Entry) error {
+	b, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".verified-*")
 	if err != nil {
 		return err
 	}
@@ -115,5 +144,5 @@ func (s *Store) save() error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), s.path)
+	return os.Rename(tmp.Name(), path)
 }

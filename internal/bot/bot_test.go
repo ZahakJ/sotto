@@ -72,6 +72,36 @@ func TestCheckMissingBinary(t *testing.T) {
 	}
 }
 
+// Ported from the review's TestPoCClientErrorUnclean: decode errors quote
+// the offending JSON, and that text reaches the screen.
+func TestDecodeErrorsAreClean(t *testing.T) {
+	check := checkClean(t)
+	for _, in := range []string{
+		"\x1b]0;x\x07",
+		`{"type":"\u001b[2J"`,
+		`{"type":1,"x":"\u001b"}`,
+		"{\"type\":\"a\",\"protocol\":\"\x1b[2J\"}",
+		"{\"\x1b[2J\":1,\"type\":\"a\",\"protocol\":{}}",
+	} {
+		_, err := proto.Decode([]byte(in))
+		if err == nil {
+			continue
+		}
+		check(err, in)
+	}
+	// encoding/json quotes what it quotes today; the client must not depend
+	// on that.
+	check(errors.New("bad \x1b]0;owned\x07 \xc2\x9b2J"), "raw")
+}
+
+func checkClean(t *testing.T) func(error, string) {
+	return func(err error, in string) {
+		if e := decodeError(err); strings.ContainsFunc(e.Error, func(r rune) bool { return r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) }) {
+			t.Errorf("%q -> %q", in, e.Error)
+		}
+	}
+}
+
 // A relative $PATH entry would run whatever "concord" sits in the current
 // directory, which may be a checkout or a download.
 func TestLocateIgnoresRelativePathEntries(t *testing.T) {

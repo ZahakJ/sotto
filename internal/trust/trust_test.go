@@ -3,6 +3,7 @@ package trust
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -57,5 +58,46 @@ func TestCorruptFileIsAnError(t *testing.T) {
 	}
 	if _, err := Load(path); err == nil {
 		t.Fatal("corrupt store loaded silently")
+	}
+}
+
+// Two clients on one device (say, one per terminal) share verified.json.
+// Each change re-reads the file under a lock, so neither erases the other's.
+func TestConcurrentStoresDoNotLoseMarks(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "verified.json")
+	a, _ := Load(p)
+	b, _ := Load(p)
+	fps := []string{
+		"AAAA AAAA AAAA AAAA AAAA AAAA AAAA AAAA",
+		"BBBB BBBB BBBB BBBB BBBB BBBB BBBB BBBB",
+		"CCCC CCCC CCCC CCCC CCCC CCCC CCCC CCCC",
+		"DDDD DDDD DDDD DDDD DDDD DDDD DDDD DDDD",
+	}
+	var wg sync.WaitGroup
+	for i, fp := range fps {
+		s := a
+		if i%2 == 1 {
+			s = b
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.Mark(fp, "x"); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if err := a.Unmark(fps[1]); err != nil { // b's mark, removed through a
+		t.Fatal(err)
+	}
+	c, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, fp := range fps {
+		if want := i != 1; c.Verified(fp) != want {
+			t.Errorf("%s verified=%v, want %v", fp[:4], !want, want)
+		}
 	}
 }

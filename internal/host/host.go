@@ -57,6 +57,27 @@ type Config struct {
 // missedCap bounds the events kept for a client that is not attached.
 const missedCap = 500
 
+// maxCommand bounds one line from the attached client, as concord does.
+const maxCommand = 1 << 20
+
+var errLong = errors.New("command line too long")
+
+// readCommand reads one line, giving up as soon as it passes max bytes
+// rather than buffering whatever the client sends.
+func readCommand(r *bufio.Reader, max int) ([]byte, error) {
+	var line []byte
+	for {
+		chunk, err := r.ReadSlice('\n')
+		if len(line)+len(chunk) > max {
+			return nil, errLong
+		}
+		line = append(line, chunk...)
+		if err != bufio.ErrBufferFull {
+			return line, err
+		}
+	}
+}
+
 // maxUnauth caps connections waiting to authenticate; more are refused.
 const maxUnauth = 4
 
@@ -258,6 +279,7 @@ func (d *daemon) store(line []byte) {
 }
 
 func runDaemon(cfg Config) int {
+	harden()
 	passF, statF := os.NewFile(3, "pass"), os.NewFile(4, "status")
 	report := func(s string) {
 		fmt.Fprintln(statF, s)
@@ -381,6 +403,10 @@ func (d *daemon) accept() {
 }
 
 func (d *daemon) serve(conn net.Conn) {
+	if err := checkPeer(conn, os.Getuid()); err != nil {
+		conn.Close()
+		return
+	}
 	select {
 	case d.unauth <- struct{}{}:
 	default:
@@ -440,8 +466,8 @@ func (d *daemon) serve(conn net.Conn) {
 		conn.Close()
 	}()
 	for {
-		line, err := br.ReadBytes('\n')
-		if len(line) > 1<<20 {
+		line, err := readCommand(br, maxCommand)
+		if err == errLong {
 			return
 		}
 		if len(strings.TrimSpace(string(line))) > 0 {
