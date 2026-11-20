@@ -81,6 +81,10 @@ type Event struct {
 	GuildName string          `json:"-"`
 	Joined    *Guild          `json:"-"`
 
+	// replayed: sent by a host after the events kept while detached
+	Count   int `json:"count,omitempty"`
+	Dropped int `json:"dropped,omitempty"`
+
 	Guilds  []Guild  `json:"guilds,omitempty"`
 	Members []Member `json:"members,omitempty"`
 }

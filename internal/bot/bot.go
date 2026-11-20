@@ -64,6 +64,7 @@ type Client struct {
 	events chan proto.Event
 	nextID atomic.Uint64
 	stderr *tail
+	remote bool // attached to a host daemon rather than a local concord
 
 	writeMu sync.Mutex
 	closed  bool
@@ -168,6 +169,7 @@ func Start(ctx context.Context, o Options) (*Client, error) {
 		stdin:  inW,
 		events: make(chan proto.Event, 1024),
 		stderr: newTail(20),
+		remote: len(o.Via) > 0,
 		done:   make(chan struct{}),
 	}
 	c.cmd = exec.Command(bin, args...)
@@ -260,6 +262,11 @@ func (c *Client) read(r io.ReadCloser, first chan<- proto.Event, firstErr chan<-
 				e = proto.Event{Type: "client-error", Error: derr.Error()}
 			}
 			c.events <- e
+			if e.Type == "replayed" && c.remote {
+				// Everything before the marker is in hand; the host may
+				// now forget it.
+				_, _ = c.Send(proto.Command{Cmd: "host-ack"})
+			}
 		}
 		if err == errLong {
 			if !handshake {

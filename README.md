@@ -76,7 +76,9 @@ concord-cli --via 'ssh box'               # or: --via 'jaunt run box --'
 The transport runs `concord-cli host` on `box`. The first attach starts a
 small daemon there that keeps `concord --bot` running after you leave and
 remembers, in memory, the last 500 events. The next attach, from this device
-or another, replays them. `/quit` detaches; `/shutdown` stops the daemon.
+or another, replays them, and the daemon forgets them only once the client
+confirms it has them. If more than 500 arrived, the client says how many
+were dropped. `/quit` detaches; `/shutdown` stops the daemon.
 
 ## Design notes
 

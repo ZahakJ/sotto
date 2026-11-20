@@ -368,6 +368,18 @@ func TestSpoofedNamesAreTaggedAndCannotFakeTheMark(t *testing.T) {
 	}
 }
 
+func TestDroppedReplayIsMarked(t *testing.T) {
+	m, _ := newModel(t, 80, 24, true)
+	m.update(EventMsg{proto.Event{Type: "replayed", Count: 500, Dropped: 12}})
+	if s := m.screen(); !strings.Contains(s, "12 earlier messages dropped") {
+		t.Fatalf("no dropped marker:\n%s", s)
+	}
+	m.update(tea.KeyPressMsg{Code: 'x', Text: "x"}) // a keypress clears notices, not this
+	if s := m.screen(); !strings.Contains(s, "12 earlier messages dropped") {
+		t.Fatalf("dropped marker did not last:\n%s", s)
+	}
+}
+
 func TestRenamedMemberIsFollowed(t *testing.T) {
 	m, _ := newModel(t, 120, 30, true)
 	m.update(EventMsg{members(fakebot.AliceFP, "ALIC")})

@@ -699,6 +699,13 @@ func (m *Model) onEvent(e proto.Event) {
 			return
 		}
 		m.say(true, "%s", e.Error)
+	case "replayed":
+		if e.Dropped > 0 {
+			// The host kept only its last events while detached; say so
+			// where it will be read, not in a notice the next key clears.
+			m.add(m.active, &message{kind: "system", name: "host:", at: time.Now(),
+				text: fmt.Sprintf("%d earlier messages dropped while detached (it keeps %d)", e.Dropped, e.Count)})
+		}
 	case "client-error":
 		m.say(true, "%s", e.Error)
 	}

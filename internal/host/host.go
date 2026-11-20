@@ -232,10 +232,21 @@ type daemon struct {
 	limit  *limiter      // one passphrase check at a time, daemon-wide
 	unauth chan struct{} // slots for connections not yet authenticated
 
-	mu     sync.Mutex
-	cur    net.Conn
-	ids    map[uint64]json.RawMessage // concord's id -> the attached client's
-	missed [][]byte
+	mu      sync.Mutex
+	cur     net.Conn
+	ids     map[uint64]json.RawMessage // concord's id -> the attached client's
+	missed  [][]byte                   // kept until the attached client acknowledges a replay
+	dropped int                        // events pushed out of missed since the last replay
+	acked   bool                       // the attached client has acknowledged its replay
+}
+
+// store keeps an event for replay, dropping the oldest past missedCap.
+func (d *daemon) store(line []byte) {
+	d.missed = append(d.missed, line)
+	if len(d.missed) > missedCap {
+		d.missed = d.missed[1:]
+		d.dropped++
+	}
 }
 
 func runDaemon(cfg Config) int {
@@ -324,11 +335,11 @@ func (d *daemon) pump() {
 		if err == nil {
 			if d.cur != nil {
 				d.writeLocked(line)
-			} else if keep(e.Type) {
-				d.missed = append(d.missed, line)
-				if len(d.missed) > missedCap {
-					d.missed = d.missed[1:]
-				}
+			}
+			// Until the client acknowledges its replay, what it is sent is
+			// kept too, so a connection that dies early loses nothing.
+			if keep(e.Type) && (d.cur == nil || !d.acked) {
+				d.store(line)
 			}
 		}
 		d.mu.Unlock()
@@ -403,7 +414,13 @@ func (d *daemon) serve(conn net.Conn) {
 		}
 		d.writeLocked(line)
 	}
-	d.missed = nil
+	// The buffer is cleared only when the client answers this marker with
+	// host-ack; an attach that dies first leaves it for the next one.
+	d.acked = false
+	if d.cur != nil {
+		b, _ := json.Marshal(map[string]any{"type": "replayed", "count": len(d.missed), "dropped": d.dropped})
+		d.writeLocked(append(b, '\n'))
+	}
 	d.mu.Unlock()
 
 	defer func() {
@@ -457,6 +474,13 @@ func (d *daemon) command(conn net.Conn, line []byte) bool {
 	case "quit": // detach; concord keeps running
 		reply(map[string]any{"type": "ok", "cmd": "quit"})
 		return false
+	case "host-ack": // the client has the replay
+		d.mu.Lock()
+		if d.cur == conn {
+			d.missed, d.dropped, d.acked = nil, 0, true
+		}
+		d.mu.Unlock()
+		return true
 	case "host-stop":
 		reply(map[string]any{"type": "ok", "cmd": "host-stop"})
 		go d.c.Close()
