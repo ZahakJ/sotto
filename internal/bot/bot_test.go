@@ -72,6 +72,29 @@ func TestCheckMissingBinary(t *testing.T) {
 	}
 }
 
+// A relative $PATH entry would run whatever "concord" sits in the current
+// directory, which may be a checkout or a download.
+func TestLocateIgnoresRelativePathEntries(t *testing.T) {
+	dir := t.TempDir()
+	for _, sub := range []string{".", "bin"} {
+		if err := os.MkdirAll(dir+"/"+sub, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(dir+"/"+sub+"/concord", []byte("#!/bin/sh\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(dir)
+	for _, path := range []string{".", "bin", "::", "./bin:", ":bin"} {
+		if p, err := Locate("", []string{"PATH=" + path}); err == nil {
+			t.Errorf("PATH=%q found %q", path, p)
+		}
+	}
+	if p, err := Locate("", []string{"PATH=bin:" + dir + "/bin"}); err != nil || p != dir+"/bin/concord" {
+		t.Errorf("absolute entry: %q, %v", p, err)
+	}
+}
+
 func TestStartHandshakeAndRoundTrip(t *testing.T) {
 	o := fake(t, "")
 	pass := o.Passphrase

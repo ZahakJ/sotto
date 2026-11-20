@@ -14,6 +14,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -92,10 +93,10 @@ func Locate(explicit string, env []string) (string, error) {
 		return explicit, nil
 	}
 	for _, dir := range strings.Split(lookup(env, "PATH"), string(os.PathListSeparator)) {
-		if dir == "" {
-			continue
+		if dir == "" || !filepath.IsAbs(dir) {
+			continue // empty and relative entries mean the current directory
 		}
-		p := dir + string(os.PathSeparator) + "concord"
+		p := filepath.Join(dir, "concord")
 		if st, err := os.Stat(p); err == nil && !st.IsDir() && st.Mode()&0o111 != 0 {
 			return p, nil
 		}
