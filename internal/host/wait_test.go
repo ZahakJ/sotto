@@ -23,7 +23,7 @@ func TestAttachRelaysWaitAndOutlastsTheDeadline(t *testing.T) {
 	statusTimeout = 500 * time.Millisecond
 	t.Cleanup(func() { statusTimeout = old })
 
-	base := t.TempDir()
+	base := shortDir(t)
 	cfg := Config{Home: filepath.Join(base, "identity"), Sock: filepath.Join(base, "host.sock")}
 	ln, err := net.Listen("unix", cfg.Sock)
 	if err != nil {
@@ -69,7 +69,7 @@ func TestAttachRelaysWaitAndOutlastsTheDeadline(t *testing.T) {
 // After wrong guesses the real daemon tells a waiting client how long, and
 // the right passphrase still gets in.
 func TestBackoffIsAnnouncedToTheClient(t *testing.T) {
-	base := t.TempDir()
+	base := shortDir(t)
 	t.Cleanup(func() { _ = exec.Command("pkill", "-f", "--", "--home "+base).Run() })
 	c, err := bot.Start(context.Background(), attach(t, base, "pw"))
 	if err != nil {

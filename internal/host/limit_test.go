@@ -55,7 +55,7 @@ func TestLimiterBacksOffExponentiallyAndResets(t *testing.T) {
 // Ported from the review's TestPoCHost (a): 400 parallel wrong guesses were
 // all answered within about a second.
 func TestParallelGuessesAreRateLimited(t *testing.T) {
-	base := t.TempDir()
+	base := shortDir(t)
 	sock := filepath.Join(base, "host.sock")
 	t.Cleanup(func() { _ = exec.Command("pkill", "-f", "--", "--home "+base).Run() })
 	c1, err := bot.Start(context.Background(), attach(t, base, "pw"))

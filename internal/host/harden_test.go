@@ -18,7 +18,7 @@ import (
 // The socket is checked against the peer's uid, not only by the
 // directory's permissions.
 func TestPeerUIDIsChecked(t *testing.T) {
-	sock := filepath.Join(t.TempDir(), "s")
+	sock := filepath.Join(shortDir(t), "s")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +50,7 @@ func TestDaemonIsNotDumpable(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("reads /proc")
 	}
-	base := t.TempDir()
+	base := shortDir(t)
 	t.Cleanup(func() { _ = exec.Command("pkill", "-f", "--", "--home "+base).Run() })
 	c, err := bot.Start(context.Background(), attach(t, base, "pw"))
 	if err != nil {
@@ -78,5 +78,21 @@ func TestDaemonIsNotDumpable(t *testing.T) {
 				t.Errorf("core limit: %q", l)
 			}
 		}
+	}
+}
+
+// A data directory deep enough to push the socket path past the system's
+// limit (104 bytes on macOS, 108 on Linux) is refused with a clear error.
+func TestLongSocketPathIsRefused(t *testing.T) {
+	home := filepath.Join(shortDir(t), strings.Repeat("d", 110))
+	var out, errb strings.Builder
+	if code := Main([]string{"--home", home}, strings.NewReader(""), &out, &errb); code == 0 {
+		t.Fatal("accepted")
+	}
+	if !strings.Contains(errb.String(), "too long") || !strings.Contains(errb.String(), "--home") {
+		t.Fatalf("stderr %q", errb.String())
+	}
+	if out.Len() != 0 {
+		t.Fatalf("greeted anyway: %q", out.String())
 	}
 }

@@ -34,6 +34,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -57,6 +58,15 @@ type Config struct {
 
 // missedCap bounds the events kept for a client that is not attached.
 const missedCap = 500
+
+// maxSockPath is the longest Unix socket path the system accepts: the size
+// of sockaddr_un's sun_path, 108 bytes on Linux and 104 on macOS and BSD.
+func maxSockPath() int {
+	if runtime.GOOS == "linux" {
+		return 108
+	}
+	return 104
+}
 
 // statusTimeout bounds the wait for the daemon's answer to a handshake.
 var statusTimeout = 30 * time.Second
@@ -106,6 +116,10 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		*base = b
 	}
 	cfg.Home, cfg.Sock = paths.Identity(*base), paths.Sock(*base)
+	if max := maxSockPath(); len(cfg.Sock) > max {
+		fmt.Fprintf(stderr, "sotto host: the socket path %s is too long for this system (%d bytes, at most %d); use a shorter --home\n", cfg.Sock, len(cfg.Sock), max)
+		return 1
+	}
 	if err := paths.Guard(cfg.Home, env); err != nil {
 		fmt.Fprintln(stderr, "sotto host:", err)
 		return 1

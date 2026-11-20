@@ -36,7 +36,7 @@ func waitFor(c *bot.Client, id string, d time.Duration) bool {
 // Ported from the review's TestPoCHost (b): a connection that authenticates
 // and dies at once used to take the replay buffer with it.
 func TestAbortedAttachKeepsTheReplay(t *testing.T) {
-	base := t.TempDir()
+	base := shortDir(t)
 	sock := filepath.Join(base, "host.sock")
 	t.Cleanup(func() { _ = exec.Command("pkill", "-f", "--", "--home "+base).Run() })
 	c1, err := bot.Start(context.Background(), attach(t, base, "pw"))
@@ -100,7 +100,7 @@ func TestMissedOverflowIsCounted(t *testing.T) {
 // asked for, so the client can ask twice; a running host or an existing
 // identity is not.
 func TestFirstRemoteAttachAsksTwice(t *testing.T) {
-	base := t.TempDir()
+	base := shortDir(t)
 	t.Cleanup(func() { _ = exec.Command("pkill", "-f", "--", "--home "+base).Run() })
 	var asked []bool
 	ask := func(confirm bool) ([]byte, error) {

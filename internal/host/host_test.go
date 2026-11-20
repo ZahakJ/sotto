@@ -64,7 +64,7 @@ func next(t *testing.T, c *bot.Client, typ string) proto.Event {
 }
 
 func TestAttachDetachReattach(t *testing.T) {
-	base := t.TempDir()
+	base := shortDir(t)
 	sock := filepath.Join(base, "host.sock")
 	t.Cleanup(func() {
 		if _, err := os.Stat(sock); err == nil { // a daemon outlived the test
@@ -137,7 +137,7 @@ func TestAttachDetachReattach(t *testing.T) {
 }
 
 func TestFirstAttachWithWrongPassphraseStartsNothing(t *testing.T) {
-	base := t.TempDir()
+	base := shortDir(t)
 	_, err := bot.Start(context.Background(), attach(t, base, "nope"))
 	if err == nil || !strings.Contains(err.Error(), "wrong passphrase") {
 		t.Fatalf("err = %v", err)
