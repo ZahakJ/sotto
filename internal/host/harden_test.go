@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ZahakJ/concord-cli/internal/bot"
-	"github.com/ZahakJ/concord-cli/internal/proto"
+	"github.com/ZahakJ/sotto/internal/bot"
+	"github.com/ZahakJ/sotto/internal/proto"
 )
 
 // The socket is checked against the peer's uid, not only by the

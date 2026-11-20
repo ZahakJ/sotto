@@ -13,9 +13,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/ZahakJ/concord-cli/internal/fakebot"
-	"github.com/ZahakJ/concord-cli/internal/proto"
-	"github.com/ZahakJ/concord-cli/internal/trust"
+	"github.com/ZahakJ/sotto/internal/fakebot"
+	"github.com/ZahakJ/sotto/internal/proto"
+	"github.com/ZahakJ/sotto/internal/trust"
 )
 
 func TestMain(m *testing.M) {

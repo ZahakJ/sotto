@@ -1,4 +1,4 @@
-// Command concord-cli is a small terminal client for Concord. It drives the
+// Command sotto is a small terminal client for Concord. It drives the
 // headless `concord --bot` over its line protocol, either here or, attached
 // over an existing transport, on another of your machines.
 package main
@@ -16,29 +16,29 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/term"
 
-	"github.com/ZahakJ/concord-cli/internal/bot"
-	"github.com/ZahakJ/concord-cli/internal/host"
-	"github.com/ZahakJ/concord-cli/internal/paths"
-	"github.com/ZahakJ/concord-cli/internal/proto"
-	"github.com/ZahakJ/concord-cli/internal/trust"
-	"github.com/ZahakJ/concord-cli/internal/ui"
+	"github.com/ZahakJ/sotto/internal/bot"
+	"github.com/ZahakJ/sotto/internal/host"
+	"github.com/ZahakJ/sotto/internal/paths"
+	"github.com/ZahakJ/sotto/internal/proto"
+	"github.com/ZahakJ/sotto/internal/trust"
+	"github.com/ZahakJ/sotto/internal/ui"
 )
 
 // version is stamped at release time with -ldflags "-X main.version=…".
 var version = "dev"
 
-const usage = `concord-cli: a terminal client for Concord
+const usage = `sotto: a terminal client for Concord
 
 Usage:
-  concord-cli                       run concord here, with its own identity
-  concord-cli --via 'ssh box'       attach to the identity kept on another machine
-  concord-cli host                  the far end of --via (started by the transport)
+  sotto                   run concord here, with its own identity
+  sotto --via 'ssh box'   attach to the identity kept on another machine
+  sotto host              the far end of --via (started by the transport)
 
 Flags:
   --concord PATH   the concord binary (default: $CONCORD_BIN, then $PATH)
-  --home DIR       data directory (default: $XDG_DATA_HOME/concord-cli)
+  --home DIR       data directory (default: $XDG_DATA_HOME/sotto)
   --via CMD        transport to the host, split on spaces, e.g. 'jaunt run box --'
-  --remote CMD     what the transport runs (default: 'concord-cli host')
+  --remote CMD     what the transport runs (default: 'sotto host')
   --version        print versions and exit
 
 Keys: ctrl-k switch · tab members · /help for the rest.
@@ -49,18 +49,18 @@ func main() {
 		os.Exit(host.Main(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
 	}
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "concord-cli:", err)
+		fmt.Fprintln(os.Stderr, "sotto:", err)
 		os.Exit(1)
 	}
 }
 
 func run() error {
-	fs := flag.NewFlagSet("concord-cli", flag.ContinueOnError)
+	fs := flag.NewFlagSet("sotto", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 	concord := fs.String("concord", "", "")
 	baseFlag := fs.String("home", "", "")
 	via := fs.String("via", "", "")
-	remote := fs.String("remote", "concord-cli host", "")
+	remote := fs.String("remote", "sotto host", "")
 	showVersion := fs.Bool("version", false, "")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -85,7 +85,7 @@ func run() error {
 	remoteMode := *via != ""
 
 	if *showVersion {
-		fmt.Printf("concord-cli %s (bot protocol v%d)\n", version, proto.Version)
+		fmt.Printf("sotto %s (bot protocol v%d)\n", version, proto.Version)
 		if remoteMode {
 			return nil
 		}
@@ -173,7 +173,7 @@ func run() error {
 func askPassphrase(confirm bool) ([]byte, error) {
 	fd := int(os.Stdin.Fd())
 	if !term.IsTerminal(fd) {
-		return nil, errors.New("the passphrase is read from a terminal; run concord-cli in one")
+		return nil, errors.New("the passphrase is read from a terminal; run sotto in one")
 	}
 	read := func(prompt string) ([]byte, error) {
 		fmt.Fprint(os.Stderr, prompt)

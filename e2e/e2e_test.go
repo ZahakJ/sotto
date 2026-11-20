@@ -1,8 +1,8 @@
 //go:build e2e
 
-// Package e2e runs concord-cli against real concord peers on this machine.
+// Package e2e runs sotto against real concord peers on this machine.
 //
-//	CONCORD_BIN=/path/to/concord CONCORD_CLI_BIN=/path/to/concord-cli \
+//	CONCORD_BIN=/path/to/concord SOTTO_BIN=/path/to/sotto \
 //	  go test -tags e2e -v ./e2e
 //
 // Every process gets a throwaway HOME, XDG_CONFIG_HOME, XDG_DATA_HOME and
@@ -24,10 +24,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/ZahakJ/concord-cli/internal/bot"
-	"github.com/ZahakJ/concord-cli/internal/proto"
-	"github.com/ZahakJ/concord-cli/internal/trust"
-	"github.com/ZahakJ/concord-cli/internal/ui"
+	"github.com/ZahakJ/sotto/internal/bot"
+	"github.com/ZahakJ/sotto/internal/proto"
+	"github.com/ZahakJ/sotto/internal/trust"
+	"github.com/ZahakJ/sotto/internal/ui"
 )
 
 type person struct {
@@ -51,7 +51,7 @@ func newPerson(t *testing.T, root, name string) person {
 	return p
 }
 
-func (p person) identity() string { return filepath.Join(p.data, "concord-cli", "identity") }
+func (p person) identity() string { return filepath.Join(p.data, "sotto", "identity") }
 
 func need(t *testing.T, key string) string {
 	v := os.Getenv(key)
@@ -90,7 +90,7 @@ var sgr = regexp.MustCompile(`\x1b\[[0-9;:]*m`)
 
 func TestTwoPeersOverLAN(t *testing.T) {
 	concord := need(t, "CONCORD_BIN")
-	cli := need(t, "CONCORD_CLI_BIN")
+	cli := need(t, "SOTTO_BIN")
 	root := t.TempDir()
 	alice, bob := newPerson(t, root, "alice"), newPerson(t, root, "bob")
 	t.Cleanup(func() { _ = exec.Command("pkill", "-f", "--", root).Run() })
@@ -137,9 +137,9 @@ func TestTwoPeersOverLAN(t *testing.T) {
 	code := strings.TrimSpace(expect(regexp.MustCompile(`^\s*(\S{20,})\s*$`))[1])
 	t.Logf("alice created guild %s and an invite (%d chars)", gid, len(code))
 
-	// 2. Bob, through concord-cli in local mode, joins by invite while
+	// 2. Bob, through sotto in local mode, joins by invite while
 	// Alice is online to admit him.
-	bobStore, _ := trust.Load(filepath.Join(bob.data, "concord-cli", "verified.json"))
+	bobStore, _ := trust.Load(filepath.Join(bob.data, "sotto", "verified.json"))
 	bc, err := bot.Start(context.Background(), bot.Options{
 		Binary: concord, Home: bob.identity(), Passphrase: []byte("bob-pass"), Env: bob.env, ReadyTimeout: time.Minute,
 	})
@@ -260,7 +260,7 @@ func TestTwoPeersOverLAN(t *testing.T) {
 	typeLine(am, "/shutdown")
 	ac.Close()
 	bc.Close()
-	sock := filepath.Join(alice.data, "concord-cli", "host.sock")
+	sock := filepath.Join(alice.data, "sotto", "host.sock")
 	for deadline := time.Now().Add(15 * time.Second); ; time.Sleep(200 * time.Millisecond) {
 		if _, err := os.Stat(sock); os.IsNotExist(err) {
 			break

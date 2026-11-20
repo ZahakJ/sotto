@@ -22,8 +22,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ZahakJ/concord-cli/internal/proto"
-	"github.com/ZahakJ/concord-cli/internal/safe"
+	"github.com/ZahakJ/sotto/internal/proto"
+	"github.com/ZahakJ/sotto/internal/safe"
 )
 
 var (
@@ -49,7 +49,7 @@ type Options struct {
 	// Via, when set, attaches to a host on another machine instead of
 	// running concord here: Via is the transport command (say
 	// ["jaunt","run","box","--"] or ["ssh","box"]) and Remote the command it
-	// runs there (["concord-cli","host"]). The passphrase then goes down the
+	// runs there (["sotto","host"]). The passphrase then goes down the
 	// transport's stdin as the first line, not into any environment.
 	Via    []string
 	Remote []string

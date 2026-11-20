@@ -14,7 +14,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/ZahakJ/concord-cli/internal/safe"
+	"github.com/ZahakJ/sotto/internal/safe"
 )
 
 // Version is the protocol revision this client understands: the one
@@ -221,7 +221,7 @@ func CheckReady(e Event) error {
 		return fmt.Errorf("concord's \"ready\" lacks fingerprint or peerId; it is not a protocol v%d bot", Version)
 	}
 	if e.Protocol > Version {
-		return fmt.Errorf("concord speaks protocol v%d; this client understands v%d (upgrade concord-cli)", e.Protocol, Version)
+		return fmt.Errorf("concord speaks protocol v%d; this client understands v%d (upgrade sotto)", e.Protocol, Version)
 	}
 	return nil
 }

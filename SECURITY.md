@@ -1,6 +1,6 @@
 # Security policy
 
-concord-cli is a front end for `concord --bot`. Concord's own cryptography,
+sotto is a front end for `concord --bot`. Concord's own cryptography,
 networking and threat model are Concord's; report problems there to that
 project, through its
 [security policy](https://github.com/ZahakJ/concord/blob/main/SECURITY.md).
@@ -21,7 +21,7 @@ Report here what this client adds:
 
 Use GitHub's private vulnerability reporting: the *Security* tab, then
 *Report a vulnerability*. Please do not open a public issue until a fix has
-shipped. Say which version you tested (`concord-cli --version`) and how to
+shipped. Say which version you tested (`sotto --version`) and how to
 reproduce it. A failing test in the style of
 `TestEscapeInjectionThroughEveryRemoteField` is ideal.
 

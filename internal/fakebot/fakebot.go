@@ -1,5 +1,5 @@
 // Package fakebot is a stand-in for `concord --bot`, for tests. A test binary
-// re-executes itself with CONCORD_CLI_FAKE=1 and calls Main from TestMain, so
+// re-executes itself with SOTTO_FAKE=1 and calls Main from TestMain, so
 // the client is exercised against a real child process: pipes, environment,
 // exit codes and all, without a network.
 //
@@ -28,7 +28,7 @@ import (
 )
 
 // Env is the variable that turns a test binary into the fake.
-const Env = "CONCORD_CLI_FAKE"
+const Env = "SOTTO_FAKE"
 
 // Escape sequences a hostile peer would try. Shared with the tests that
 // check none of them reach the screen.

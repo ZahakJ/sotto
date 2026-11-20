@@ -1,4 +1,4 @@
-// Package paths decides where concord-cli keeps things. Its identity is its
+// Package paths decides where sotto keeps things. Its identity is its
 // own: a separate CONCORD_HOME, never the desktop app's profile.
 package paths
 
@@ -10,17 +10,17 @@ import (
 	"strings"
 )
 
-// Base is the client's data directory: $XDG_DATA_HOME/concord-cli, or
-// ~/.local/share/concord-cli.
+// Base is the client's data directory: $XDG_DATA_HOME/sotto, or
+// ~/.local/share/sotto.
 func Base(env []string) (string, error) {
 	if d := get(env, "XDG_DATA_HOME"); d != "" && filepath.IsAbs(d) {
-		return filepath.Join(d, "concord-cli"), nil
+		return filepath.Join(d, "sotto"), nil
 	}
 	home := get(env, "HOME")
 	if home == "" {
 		return "", errors.New("neither $XDG_DATA_HOME nor $HOME is set; pass --home")
 	}
-	return filepath.Join(home, ".local", "share", "concord-cli"), nil
+	return filepath.Join(home, ".local", "share", "sotto"), nil
 }
 
 // Identity is the CONCORD_HOME given to concord.
@@ -52,7 +52,7 @@ func Guard(identity string, env []string) error {
 	for _, g := range GUIProfiles(env) {
 		g = resolve(g)
 		if id == g || strings.HasPrefix(id, g+string(filepath.Separator)) {
-			return fmt.Errorf("refusing to use %s: it is the Concord app's profile; concord-cli keeps its own identity (see --home)", identity)
+			return fmt.Errorf("refusing to use %s: it is the Concord app's profile; sotto keeps its own identity (see --home)", identity)
 		}
 	}
 	return nil

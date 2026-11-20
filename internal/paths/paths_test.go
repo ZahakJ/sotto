@@ -9,7 +9,7 @@ func TestBaseAndGuard(t *testing.T) {
 	home := t.TempDir()
 	env := []string{"HOME=" + home}
 	base, err := Base(env)
-	if err != nil || base != filepath.Join(home, ".local/share/concord-cli") {
+	if err != nil || base != filepath.Join(home, ".local/share/sotto") {
 		t.Fatalf("Base = %q, %v", base, err)
 	}
 	if err := Guard(Identity(base), env); err != nil {
@@ -24,7 +24,7 @@ func TestBaseAndGuard(t *testing.T) {
 	if Guard(filepath.Join(xdg, "concord"), append(env, "XDG_CONFIG_HOME="+xdg)) == nil {
 		t.Fatal("XDG GUI profile accepted")
 	}
-	if b, _ := Base(append(env, "XDG_DATA_HOME=/d")); b != "/d/concord-cli" {
+	if b, _ := Base(append(env, "XDG_DATA_HOME=/d")); b != "/d/sotto" {
 		t.Fatalf("XDG base = %q", b)
 	}
 }

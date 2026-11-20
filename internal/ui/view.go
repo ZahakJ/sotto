@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/ZahakJ/concord-cli/internal/trust"
+	"github.com/ZahakJ/sotto/internal/trust"
 )
 
 // fit pads or cuts a (possibly styled) string to exactly w cells.
@@ -64,9 +64,9 @@ func (m *Model) layout() layout {
 func (m *Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
-	v.WindowTitle = "concord"
+	v.WindowTitle = "sotto"
 	if n := m.totalUnread(); n > 0 {
-		v.WindowTitle = fmt.Sprintf("concord (%d)", n)
+		v.WindowTitle = fmt.Sprintf("sotto (%d)", n)
 	}
 	if m.w >= 20 && m.h >= 5 {
 		l := m.layout()
@@ -192,7 +192,7 @@ func (m *Model) sidebar(l layout) []string {
 		list = append(list, row{s: bar + " " + label + " " + m.th.accent(count), active: active})
 	}
 
-	out[0] = " " + m.th.accentBold("concord")
+	out[0] = " " + m.th.accentBold("sotto")
 	if m.opts.Remote {
 		out[0] += m.th.dim(" · attached")
 	}

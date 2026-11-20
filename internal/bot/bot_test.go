@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ZahakJ/concord-cli/internal/fakebot"
-	"github.com/ZahakJ/concord-cli/internal/proto"
+	"github.com/ZahakJ/sotto/internal/fakebot"
+	"github.com/ZahakJ/sotto/internal/proto"
 )
 
 func TestMain(m *testing.M) {

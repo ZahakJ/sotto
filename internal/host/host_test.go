@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ZahakJ/concord-cli/internal/bot"
-	"github.com/ZahakJ/concord-cli/internal/fakebot"
-	"github.com/ZahakJ/concord-cli/internal/proto"
+	"github.com/ZahakJ/sotto/internal/bot"
+	"github.com/ZahakJ/sotto/internal/fakebot"
+	"github.com/ZahakJ/sotto/internal/proto"
 )
 
 // The test binary plays three parts: the host (`<exe> host …`), the

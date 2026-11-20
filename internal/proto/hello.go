@@ -9,14 +9,14 @@ import (
 )
 
 // HelloVersion names the attach handshake. The host first says whether it
-// holds an identity yet, "HOST concord-cli-host/2 new" or "... existing", so
+// holds an identity yet, "HOST sotto-host/1 new" or "... existing", so
 // that the client knows to ask for a new passphrase twice. The client then
-// sends one line, "HELLO concord-cli-host/2 <base64 passphrase>", before the
+// sends one line, "HELLO sotto-host/1 <base64 passphrase>", before the
 // bot protocol starts. The passphrase travels inside the transport (the mesh's
 // encrypted session), never in an environment variable or argument of the
 // remote process, so nothing on the remote side can read it from ps or
 // /proc/*/cmdline.
-const HelloVersion = "concord-cli-host/2"
+const HelloVersion = "sotto-host/1"
 
 const helloPrefix = "HELLO " + HelloVersion + " "
 
@@ -36,7 +36,7 @@ func WriteGreeting(w io.Writer, fresh bool) error {
 func ReadGreeting(r *bufio.Reader) (fresh bool, err error) {
 	line, err := r.ReadSlice('\n')
 	if err != nil {
-		return false, errors.New("no greeting from the host (is concord-cli installed there, and the same version?)")
+		return false, errors.New("no greeting from the host (is sotto installed there, and the same version?)")
 	}
 	switch string(bytes.TrimRight(line, "\r\n")) {
 	case greetPrefix + "new":

@@ -12,9 +12,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/ZahakJ/concord-cli/internal/proto"
-	"github.com/ZahakJ/concord-cli/internal/safe"
-	"github.com/ZahakJ/concord-cli/internal/trust"
+	"github.com/ZahakJ/sotto/internal/proto"
+	"github.com/ZahakJ/sotto/internal/safe"
+	"github.com/ZahakJ/sotto/internal/trust"
 )
 
 // Sender is the bot connection, local or attached over a mesh.

@@ -1,4 +1,4 @@
-module github.com/ZahakJ/concord-cli
+module github.com/ZahakJ/sotto
 
 go 1.26.0
 

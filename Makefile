@@ -1,4 +1,4 @@
-# concord-cli build targets.
+# sotto build targets.
 
 VERSION ?= dev
 OUT     ?= bin
@@ -11,8 +11,8 @@ CONCORD_BIN ?=
 
 .PHONY: build test vet fmt fuzz vuln e2e clean help
 
-build: ## build bin/concord-cli
-	go build -trimpath -ldflags '$(LDFLAGS)' -o $(OUT)/concord-cli .
+build: ## build bin/sotto
+	go build -trimpath -ldflags '$(LDFLAGS)' -o $(OUT)/sotto .
 
 test: ## unit tests, with the race detector
 	go test -race -count=1 ./...
@@ -35,7 +35,7 @@ e2e: build ## two real peers on this machine (needs CONCORD_SRC or CONCORD_BIN)
 		(cd "$(CONCORD_SRC)" && go build -o "$(abspath $(OUT))/concord" ./cmd/concord) || exit 1; \
 		bin="$(abspath $(OUT))/concord"; \
 	fi; \
-	CONCORD_BIN="$$bin" CONCORD_CLI_BIN="$(abspath $(OUT))/concord-cli" \
+	CONCORD_BIN="$$bin" SOTTO_BIN="$(abspath $(OUT))/sotto" \
 		go test -tags e2e -count=1 -v -timeout 10m ./e2e
 
 clean:

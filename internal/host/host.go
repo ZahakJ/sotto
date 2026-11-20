@@ -1,6 +1,6 @@
 // Package host lets one headless concord serve a person on several devices.
 //
-// `concord-cli host` runs on the machine that keeps the identity. It is not
+// `sotto host` runs on the machine that keeps the identity. It is not
 // started by hand: a client on another device runs it through a transport
 // that already exists between the two machines (a mesh's `jaunt run`, or
 // ssh), so the host never opens a port. Its stdin and stdout are the
@@ -39,9 +39,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ZahakJ/concord-cli/internal/bot"
-	"github.com/ZahakJ/concord-cli/internal/paths"
-	"github.com/ZahakJ/concord-cli/internal/proto"
+	"github.com/ZahakJ/sotto/internal/bot"
+	"github.com/ZahakJ/sotto/internal/paths"
+	"github.com/ZahakJ/sotto/internal/proto"
 )
 
 // Config locates everything the host needs on its machine.
@@ -81,12 +81,12 @@ func readCommand(r *bufio.Reader, max int) ([]byte, error) {
 // maxUnauth caps connections waiting to authenticate; more are refused.
 const maxUnauth = 4
 
-// Main is `concord-cli host [--concord PATH] [--home DIR]`.
+// Main is `sotto host [--concord PATH] [--home DIR]`.
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("concord-cli host", flag.ContinueOnError)
+	fs := flag.NewFlagSet("sotto host", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	concord := fs.String("concord", "", "concord binary on this machine (default: $CONCORD_BIN, then $PATH)")
-	base := fs.String("home", "", "data directory (default: $XDG_DATA_HOME/concord-cli)")
+	base := fs.String("home", "", "data directory (default: $XDG_DATA_HOME/sotto)")
 	daemon := fs.Bool("daemon", false, "internal: run the daemon")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -96,19 +96,19 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if *base == "" {
 		b, err := paths.Base(env)
 		if err != nil {
-			fmt.Fprintln(stderr, "concord-cli host:", err)
+			fmt.Fprintln(stderr, "sotto host:", err)
 			return 1
 		}
 		*base = b
 	}
 	cfg.Home, cfg.Sock = paths.Identity(*base), paths.Sock(*base)
 	if err := paths.Guard(cfg.Home, env); err != nil {
-		fmt.Fprintln(stderr, "concord-cli host:", err)
+		fmt.Fprintln(stderr, "sotto host:", err)
 		return 1
 	}
 	self, err := os.Executable()
 	if err != nil {
-		fmt.Fprintln(stderr, "concord-cli host:", err)
+		fmt.Fprintln(stderr, "sotto host:", err)
 		return 1
 	}
 	cfg.Self = self
@@ -117,7 +117,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runDaemon(cfg)
 	}
 	if err := Attach(cfg, stdin, stdout); err != nil {
-		fmt.Fprintln(stderr, "concord-cli host:", err)
+		fmt.Fprintln(stderr, "sotto host:", err)
 		return 1
 	}
 	return 0

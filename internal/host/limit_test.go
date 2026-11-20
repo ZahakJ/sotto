@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ZahakJ/concord-cli/internal/bot"
-	"github.com/ZahakJ/concord-cli/internal/proto"
+	"github.com/ZahakJ/sotto/internal/bot"
+	"github.com/ZahakJ/sotto/internal/proto"
 )
 
 type fakeClock struct {
