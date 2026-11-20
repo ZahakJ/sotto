@@ -300,7 +300,7 @@ func (m *Model) lookup(who string) []proto.Member {
 	var byName, byFP []proto.Member
 	n := trust.Norm(who)
 	for _, x := range m.known() {
-		if strings.EqualFold(x.Name, strings.TrimSpace(who)) {
+		if safe.Skeleton(x.Name) == safe.Skeleton(who) {
 			byName = append(byName, x)
 		} else if len(n) >= 4 && strings.HasPrefix(trust.Norm(x.Fingerprint), n) {
 			byFP = append(byFP, x)
@@ -382,9 +382,10 @@ func (m *Model) displayName(guildID string, msg *message) string {
 	if msg.own {
 		return m.selfName
 	}
-	clash := strings.EqualFold(msg.name, m.selfName)
+	sk := safe.Skeleton(msg.name)
+	clash := sk == safe.Skeleton(m.selfName)
 	for _, x := range m.members[guildID] {
-		if strings.EqualFold(x.Name, msg.name) && trust.Norm(x.Fingerprint) != trust.Norm(msg.sender) {
+		if safe.Skeleton(x.Name) == sk && trust.Norm(x.Fingerprint) != trust.Norm(msg.sender) {
 			clash = true
 		}
 	}

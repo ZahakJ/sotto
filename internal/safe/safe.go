@@ -11,7 +11,11 @@ package safe
 
 import (
 	"strings"
+	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -32,14 +36,58 @@ func Line(s string) string { return clean(s, false, MaxText) }
 // Text cleans a message body, keeping its line breaks (normalised to \n).
 func Text(s string) string { return clean(s, true, MaxText) }
 
-// Name cleans a short self-chosen label. A blank one becomes "?", so that a
-// peer cannot be invisible.
+// Name cleans a short self-chosen label. Beyond Line, it removes what lets
+// one name pass for another: invisible format characters, variation
+// selectors, filler characters, and check marks (the client's verified mark
+// is never part of a name). Runs of spaces collapse to one. A blank name
+// becomes "?", so that a peer cannot be invisible.
 func Name(s string) string {
-	out := strings.TrimSpace(clean(s, false, MaxName))
-	if out == "" {
+	var b strings.Builder
+	space := false
+	for _, r := range clean(s, false, MaxName) {
+		switch {
+		case invisible(r), checkLike(r):
+			continue
+		case unicode.IsSpace(r):
+			space = true
+			continue
+		}
+		if space && b.Len() > 0 {
+			b.WriteByte(' ')
+		}
+		space = false
+		b.WriteRune(r)
+	}
+	if b.Len() == 0 {
 		return "?"
 	}
-	return out
+	return b.String()
+}
+
+// Skeleton is what two names are compared by: Name, then NFKC and case
+// folding, so that "alice", "ALICE" and a fullwidth "ａlice" collide.
+func Skeleton(s string) string {
+	return Name(cases.Fold().String(norm.NFKC.String(Name(s))))
+}
+
+func invisible(r rune) bool {
+	switch {
+	case unicode.Is(unicode.Cf, r): // ZWSP, ZWJ, WJ, soft hyphen, bidi marks, tags
+		return true
+	case r >= 0xfe00 && r <= 0xfe0f, r >= 0xe0100 && r <= 0xe01ef: // variation selectors
+		return true
+	case r == 0x034f, r == 0x115f, r == 0x1160, r == 0x3164, r == 0xffa0, r == 0x2800:
+		return true // grapheme joiner, Hangul fillers, braille blank
+	}
+	return false
+}
+
+func checkLike(r rune) bool {
+	switch r {
+	case 0x2713, 0x2714, 0x2611, 0x2705, 0x221a, 0x1f5f8, 0x1f5f9, 0x237b, 0x10102:
+		return true
+	}
+	return false
 }
 
 func clean(s string, keepNewlines bool, max int) string {

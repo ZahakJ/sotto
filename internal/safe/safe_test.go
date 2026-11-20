@@ -89,6 +89,45 @@ func TestOrdinaryTextUntouched(t *testing.T) {
 	}
 }
 
+// A name must not be able to look like another member's, or carry the
+// verified mark. Byte escapes: U+200B ZWSP, U+2060 WJ, U+00AD soft hyphen,
+// U+FE0F VS16, U+3164 Hangul filler, U+2713/2714/2611/2705 check marks.
+func TestNameStripsInvisiblesAndChecks(t *testing.T) {
+	cases := map[string]string{
+		"alice\xe2\x80\x8b \xe2\x9c\x93": "alice",
+		"al\xe2\x81\xa0ice":              "alice",
+		"al\xc2\xadice":                  "alice",
+		"alice\xef\xb8\x8f":              "alice",
+		"\xe3\x85\xa4alice":              "alice",
+		"\xe2\x9c\x94 bob \xe2\x98\x91":  "bob",
+		"\xe2\x9c\x85carol":              "carol",
+		"a   b":                          "a b",
+		"\xe2\x80\x8b":                   "?",
+	}
+	for in, want := range cases {
+		if got := Name(in); got != want {
+			t.Errorf("Name(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestSkeletonFoldsLookalikes(t *testing.T) {
+	same := [][2]string{
+		{"alice", "ALICE"},
+		{"alice", "\xef\xbd\x81lice"}, // fullwidth a
+		{"me", "Me\xe2\x80\x8b"},
+		{"alice", "alice \xe2\x9c\x93"},
+	}
+	for _, p := range same {
+		if Skeleton(p[0]) != Skeleton(p[1]) {
+			t.Errorf("Skeleton(%q) != Skeleton(%q)", p[0], p[1])
+		}
+	}
+	if Skeleton("alice") == Skeleton("alicia") {
+		t.Error("different names share a skeleton")
+	}
+}
+
 func TestLimits(t *testing.T) {
 	long := strings.Repeat("x", MaxText+100)
 	if got := Text(long); utf8.RuneCountInString(got) != MaxText+1 || !strings.HasSuffix(got, "…") {

@@ -325,6 +325,49 @@ func TestSameNameIsDisambiguated(t *testing.T) {
 	}
 }
 
+// Ported from the review's TestPoCSpoof: an impostor named "alice<ZWSP> ✓"
+// must not look like verified alice, and "me<ZWSP>" must not look like the
+// user. The mark lives in its own column, before the name.
+func TestSpoofedNamesAreTaggedAndCannotFakeTheMark(t *testing.T) {
+	line := func(screen, needle string) string {
+		for _, l := range strings.Split(screen, "\n") {
+			if strings.Contains(l, needle) {
+				return l
+			}
+		}
+		return ""
+	}
+	for _, plain := range []bool{true, false} {
+		m, _ := newModel(t, 120, 30, plain)
+		m.update(EventMsg{members(fakebot.SelfFP, "me", fakebot.AliceFP, "alice", fakebot.MalloryFP, "x")})
+		if err := m.trust.Mark(fakebot.AliceFP, "alice"); err != nil {
+			t.Fatal(err)
+		}
+		dec := func(id, fp, name, text string) {
+			e, err := proto.Decode([]byte(`{"type":"message","guildId":"g-den","channelId":"c-gen","messageId":"` + id +
+				`","sender":"` + fp + `","senderName":` + js(name) + `,"content":"` + text + `","sent":"2026-11-19T10:04:00Z"}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			m.update(EventMsg{e})
+		}
+		dec("1", fakebot.AliceFP, "alice", "REAL")
+		dec("2", fakebot.MalloryFP, "alice\xe2\x80\x8b \xe2\x9c\x93", "FAKE1")
+		dec("3", fakebot.MalloryFP, "me\xe2\x80\x8b", "FAKE2")
+		s := sgr.ReplaceAllString(m.screen(), "")
+		real, fake, self := line(s, "REAL"), line(s, "FAKE1"), line(s, "FAKE2")
+		if !regexp.MustCompile(`\d\d:\d\d ✓ alice  REAL`).MatchString(real) {
+			t.Errorf("plain=%v real alice: %q", plain, real)
+		}
+		if strings.Contains(fake, "✓") || !strings.Contains(fake, "alice·MALL") {
+			t.Errorf("plain=%v impostor: %q", plain, fake)
+		}
+		if !strings.Contains(self, "me·MALL") {
+			t.Errorf("plain=%v self impostor: %q", plain, self)
+		}
+	}
+}
+
 func TestRenamedMemberIsFollowed(t *testing.T) {
 	m, _ := newModel(t, 120, 30, true)
 	m.update(EventMsg{members(fakebot.AliceFP, "ALIC")})

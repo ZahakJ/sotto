@@ -344,10 +344,12 @@ func (m *Model) renderMessage(guildID string, msg *message, w int) []string {
 	if msg.own {
 		styledName = m.th.accentBold(name)
 	}
-	mark := ""
+	// The verified mark has a column of its own, before the name. Names
+	// cannot contain a check mark (safe.Name) or start with a space, so
+	// nothing a peer chooses can put one there.
+	mark := " "
 	if !msg.own && m.trust.Verified(msg.sender) {
-		mark = " " + m.th.good("✓")
-		nameW += 2
+		mark = m.th.good("✓")
 	}
 	text, style := msg.text, func(s string) string { return s }
 	switch {
@@ -360,8 +362,8 @@ func (m *Model) renderMessage(guildID string, msg *message, w int) []string {
 	case msg.edited:
 		text += "  (edited)"
 	}
-	prefix := ts + " " + styledName + mark + "  "
-	indent := 6 + nameW + 2
+	prefix := ts + " " + mark + " " + styledName + "  "
+	indent := 6 + 2 + nameW + 2
 	if w-indent < 16 { // narrow: the text goes under the name
 		return append([]string{fit(prefix, w)}, wrapInto(style, "  ", 2, text, w)...)
 	}
