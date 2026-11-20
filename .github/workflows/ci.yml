@@ -18,7 +18,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version-file: go.mod
+          go-version: '1.26.x' # latest patch: govulncheck reports the standard library too
+          check-latest: true
       - name: gofmt
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - run: go vet ./...
@@ -31,7 +32,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version-file: go.mod
+          go-version: '1.26.x'
+          check-latest: true
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
   # Real peers: builds the headless concord from its repository and runs two
@@ -46,5 +48,5 @@ jobs:
           path: concord-src
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version-file: go.mod
+          go-version-file: concord-src/go.mod # builds concord too, which may need a newer Go
       - run: make e2e CONCORD_SRC=concord-src
