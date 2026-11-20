@@ -298,12 +298,13 @@ func (c *Client) read(r io.ReadCloser, br *bufio.Reader, first chan<- proto.Even
 			if derr != nil {
 				e = decodeError(derr)
 			}
-			c.events <- e
 			if e.Type == "replayed" && c.remote {
 				// Everything before the marker is in hand; the host may
-				// now forget it.
+				// now forget it. Ack before delivering the marker, so a
+				// client that closes on seeing it cannot outrun the ack.
 				_, _ = c.Send(proto.Command{Cmd: "host-ack"})
 			}
+			c.events <- e
 		}
 		if err == errLong {
 			if !handshake {
