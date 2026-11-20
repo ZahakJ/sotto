@@ -36,5 +36,10 @@ Only the latest release. There are no backports.
 - Verification marks are kept per device in `verified.json`. They are not
   shared with Concord or with your other devices.
 - A host's daemon serves whoever can run commands as you on that machine and
-  knows the passphrase. Wrong guesses are slowed to one a second, not locked
-  out.
+  knows the passphrase. The daemon checks one passphrase at a time across all
+  connections, at most one a second; after n wrong guesses in a row the next
+  check waits 2^(n-1) seconds, up to five minutes, and a correct one resets
+  this. At most four connections may wait to authenticate; more are refused.
+  There is no lockout, and the backoff is lost when the daemon restarts.
+  Someone who can already run commands as you can also delay your own attach
+  by guessing.

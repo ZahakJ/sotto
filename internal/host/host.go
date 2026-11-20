@@ -57,6 +57,9 @@ type Config struct {
 // missedCap bounds the events kept for a client that is not attached.
 const missedCap = 500
 
+// maxUnauth caps connections waiting to authenticate; more are refused.
+const maxUnauth = 4
+
 // Main is `concord-cli host [--concord PATH] [--home DIR]`.
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("concord-cli host", flag.ContinueOnError)
@@ -226,6 +229,9 @@ type daemon struct {
 	ln   net.Listener
 	sock string
 
+	limit  *limiter      // one passphrase check at a time, daemon-wide
+	unauth chan struct{} // slots for connections not yet authenticated
+
 	mu     sync.Mutex
 	cur    net.Conn
 	ids    map[uint64]json.RawMessage // concord's id -> the attached client's
@@ -244,7 +250,11 @@ func runDaemon(cfg Config) int {
 		report("ERR no passphrase")
 		return 1
 	}
-	d := &daemon{key: make([]byte, 32), sock: cfg.Sock}
+	d := &daemon{
+		key: make([]byte, 32), sock: cfg.Sock,
+		limit:  newLimiter(time.Second, 5*time.Minute),
+		unauth: make(chan struct{}, maxUnauth),
+	}
 	if _, err := rand.Read(d.key); err != nil {
 		clear(pass)
 		report("ERR " + err.Error())
@@ -352,18 +362,26 @@ func (d *daemon) accept() {
 }
 
 func (d *daemon) serve(conn net.Conn) {
+	select {
+	case d.unauth <- struct{}{}:
+	default:
+		fmt.Fprintln(conn, "ERR busy: too many connections waiting to authenticate")
+		conn.Close()
+		return
+	}
 	br := bufio.NewReader(conn)
 	_ = conn.SetReadDeadline(time.Now().Add(15 * time.Second))
 	pass, err := proto.ReadHello(br)
 	if err != nil {
+		<-d.unauth
 		fmt.Fprintf(conn, "ERR %v\n", err)
 		conn.Close()
 		return
 	}
-	ok := hmac.Equal(d.sum(pass), d.mac)
+	ok := d.limit.attempt(func() bool { return hmac.Equal(d.sum(pass), d.mac) })
 	clear(pass)
+	<-d.unauth
 	if !ok {
-		time.Sleep(time.Second) // slow down guessing
 		fmt.Fprintln(conn, "ERR wrong passphrase for the running host")
 		conn.Close()
 		return
